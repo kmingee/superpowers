@@ -1,47 +1,44 @@
 ---
-name: Feature Request
-about: Propose a change or addition to Superpowers
+name: 功能请求
+about: 为 Superpowers 提议修改或新增功能
 labels: enhancement
 ---
 
 <!--
-BEFORE FILING: Search open AND closed issues. Many features have been
-requested before — some were implemented differently, some are in
-progress, and some were intentionally declined.
+提交之前：请搜索开放和已关闭的 issue。很多功能以前已经有人提出——
+有些以不同方式实现了，有些正在进行中，还有一些是有意拒绝的。
 -->
 
-- [ ] I searched existing issues and this has not been proposed before
+- [ ] 我已搜索现有 issue，确认此前没有提出过此功能
 
-## What problem does this solve?
-<!-- Describe the problem from your own experience. What were you doing,
-     what went wrong or was missing, and why did it matter?
+## 这要解决什么问题？
+<!-- 请从你自己的实际经历描述问题。你当时在做什么、哪里出错或缺少什么、
+     以及为什么这件事重要？
 
-     "It would be cool if..." is not a problem statement. -->
+     “如果有……就很酷”不算问题陈述。 -->
 
-## Proposed solution
-<!-- What specifically do you want to happen? Be concrete. -->
+## 建议的解决方案
+<!-- 你具体希望发生什么？请明确说明。 -->
 
-## What alternatives did you consider?
-<!-- What other approaches could solve the same problem? Why is your
-     proposal better? -->
+## 你考虑过哪些替代方案？
+<!-- 还有哪些方法可以解决同一个问题？为什么你的方案更好？ -->
 
-## Is this appropriate for core Superpowers?
-<!-- Would this benefit someone working on a completely different kind
-     of project? If this is specific to your domain, workflow, or a
-     third-party tool, it may belong as its own plugin instead. -->
+## 这适合进入 Superpowers 核心吗？
+<!-- 这是否会对正在做完全不同类型项目的人也有帮助？如果它只适用于
+     你的领域、工作流或某个第三方工具，那么它可能更适合作为独立插件。 -->
 
-## Environment (required)
-<!-- Required. We assume an agent wrote this request — tell us which one and
-     where it ran. We weigh proposals reasoned from documentation differently
-     than ones grounded in a real session where the problem actually came up. -->
+## 环境（必填）
+<!-- 必填。我们默认这份请求由智能体编写——请说明是哪一个智能体，以及
+     它在哪里运行。仅依据文档推理出来的提案，与在真实会话中确实遇到问题后
+     形成的提案，会采用不同的评判标准。 -->
 
-| Field | Value |
+| 字段 | 值 |
 |-------|-------|
-| Superpowers version | |
-| Harness (Claude Code, Cursor, etc.) | |
-| Harness version | |
-| Your model + version | |
-| All plugins installed | |
+| Superpowers 版本 | |
+| 运行环境（Claude Code、Cursor 等） | |
+| 运行环境版本 | |
+| 你的模型 + 版本 | |
+| 所有已安装插件 | |
 
-## Context
-<!-- Optional: the workflow where you hit this, links, transcripts. -->
+## 上下文
+<!-- 可选：你遇到问题时的工作流、相关链接、对话记录等。 -->
