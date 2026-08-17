@@ -1,12 +1,12 @@
-# Installing Superpowers for OpenCode
+# 为 OpenCode 安装 Superpowers
 
-## Prerequisites
+## 前置条件
 
-- [OpenCode.ai](https://opencode.ai) installed
+- 已安装 [OpenCode.ai](https://opencode.ai)
 
-## Installation
+## 安装
 
-Add superpowers to the `plugin` array in your `opencode.json` (global or project-level):
+将 superpowers 加入 `opencode.json`（全局或项目级）的 `plugin` 数组：
 
 ```json
 {
@@ -14,17 +14,15 @@ Add superpowers to the `plugin` array in your `opencode.json` (global or project
 }
 ```
 
-Restart OpenCode. The plugin installs through OpenCode's plugin manager and
-registers all skills.
+重启 OpenCode。插件会通过 OpenCode 的插件管理器安装，并注册所有技能。
 
-Verify by asking: "Tell me about your superpowers"
+可以通过询问下面这句话验证："Tell me about your superpowers"
 
-OpenCode uses its own plugin install. If you also use Claude Code, Codex, or
-another harness, install Superpowers separately for each one.
+OpenCode 使用自己的插件安装机制。如果你还使用 Claude Code、Codex 或其他运行环境，需要分别为每个环境安装 Superpowers。
 
-## Migrating from the old symlink-based install
+## 从旧的软链接安装方式迁移
 
-If you previously installed superpowers using `git clone` and symlinks, remove the old setup:
+如果你之前通过 `git clone` 和软链接安装 superpowers，请移除旧配置：
 
 ```bash
 # Remove old symlinks
@@ -37,25 +35,22 @@ rm -rf ~/.config/opencode/superpowers
 # Remove skills.paths from opencode.json if you added one for superpowers
 ```
 
-Then follow the installation steps above.
+然后按照上面的安装步骤操作。
 
-## Usage
+## 使用方法
 
-Use OpenCode's native `skill` tool:
+使用 OpenCode 原生的 `skill` 工具：
 
 ```
 use skill tool to list skills
 use skill tool to load brainstorming
 ```
 
-## Updating
+## 更新
 
-OpenCode installs Superpowers through a git-backed package spec. Some OpenCode
-and Bun versions pin that resolved git dependency in a lockfile or cache, so a
-restart may not pick up the newest Superpowers commit. If updates do not appear,
-clear OpenCode's package cache or reinstall the plugin.
+OpenCode 通过基于 git 的包规格安装 Superpowers。某些 OpenCode 和 Bun 版本会把解析后的 git 依赖固定在 lockfile 或缓存中，因此仅重启可能无法获取最新的 Superpowers 提交。如果更新没有出现，请清理 OpenCode 的包缓存或重新安装插件。
 
-To pin a specific version:
+要固定到特定版本：
 
 ```json
 {
@@ -63,27 +58,23 @@ To pin a specific version:
 }
 ```
 
-## Troubleshooting
+## 故障排查
 
-### Plugin not loading
+### 插件未加载
 
-1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -i superpowers`
-2. Verify the plugin line in your `opencode.json`
-3. Make sure you're running a recent version of OpenCode
+1. 检查日志：`opencode run --print-logs "hello" 2>&1 | grep -i superpowers`
+2. 检查 `opencode.json` 中的插件配置行
+3. 确认正在使用较新的 OpenCode 版本
 
-### Windows install issues
+### Windows 安装问题
 
-Some Windows OpenCode builds have upstream installer issues with git-backed
-plugin specs, including cache paths for `git+https` URLs and Bun not finding
-`git.exe` even when it works in a normal terminal. If OpenCode cannot install
-the plugin, try installing with system npm and pointing OpenCode at the local
-package:
+某些 Windows 版 OpenCode 的上游安装器在处理基于 git 的插件规格时存在问题，例如 `git+https` URL 的缓存路径问题，以及即使 `git.exe` 在普通终端中可用，Bun 仍然找不到它。如果 OpenCode 无法安装插件，可以尝试使用系统 npm 安装，然后让 OpenCode 指向本地包：
 
 ```powershell
 npm install superpowers@git+https://github.com/obra/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
-Then use the installed package path in `opencode.json`:
+然后在 `opencode.json` 中使用已安装包的路径：
 
 ```json
 {
@@ -91,25 +82,25 @@ Then use the installed package path in `opencode.json`:
 }
 ```
 
-### Skills not found
+### 找不到技能
 
-1. Use `skill` tool to list what's discovered
-2. Check that the plugin is loading (see above)
+1. 使用 `skill` 工具列出已发现的技能
+2. 检查插件是否已加载（见上文）
 
-### Tool mapping
+### 工具映射
 
-Skills speak in actions ("create a todo", "dispatch a subagent", "read a file"). On OpenCode these resolve to:
+技能以动作描述需求（例如“创建待办事项”“派发子智能体”“读取文件”）。在 OpenCode 中，这些动作对应：
 
 - "Create a todo" / "mark complete in todo list" → `todowrite`
-- `Subagent (general-purpose):` template → `task` tool with `subagent_type: "general"` (or `"explore"` for codebase exploration)
-- "Invoke a skill" → OpenCode's native `skill` tool
+- `Subagent (general-purpose):` 模板 → `task` 工具，并使用 `subagent_type: "general"`（探索代码库时使用 `"explore"`）
+- "Invoke a skill" → OpenCode 原生的 `skill` 工具
 - "Read a file" → `read`
 - "Create a file" / "edit a file" / "delete a file" → `apply_patch`
 - "Run a shell command" → `bash`
-- "Search file contents" / "find files by name" → `grep`, `glob`
+- "Search file contents" / "find files by name" → `grep`、`glob`
 - "Fetch a URL" → `webfetch`
 
-## Getting Help
+## 获取帮助
 
-- Report issues: https://github.com/obra/superpowers/issues
-- Full documentation: https://github.com/obra/superpowers/blob/main/docs/README.opencode.md
+- 报告问题：https://github.com/obra/superpowers/issues
+- 完整文档：https://github.com/obra/superpowers/blob/main/docs/README.opencode.md
