@@ -1,0 +1,79 @@
+name: Translate cn historical Markdown v2
+
+on:
+  push:
+    branches:
+      - cn
+    paths:
+      - '.github/workflows/translate-cn-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    if: github.repository == 'kmingee/superpowers'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out latest cn
+        uses: actions/checkout@v4
+        with:
+          ref: cn
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install translator
+        run: python -m pip install --disable-pip-version-check argostranslate
+
+      - name: Translate remaining historical Markdown
+        run: python scripts/translate_md_cn.py
+
+      - name: Validate translated targets and protected structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          from scripts.translate_md_cn import TARGETS
+
+          cjk = re.compile(r'[\u3400-\u9fff]')
+          fence = re.compile(r'^\s*(```|~~~)')
+          url = re.compile(r'https?://[^\s)>\]]+')
+          failures = []
+
+          for rel in TARGETS:
+              after = Path(rel).read_text(encoding='utf-8')
+              before = subprocess.check_output(['git', 'show', f'HEAD:{rel}'], text=True)
+              if not cjk.search(after):
+                  failures.append(f'{rel}: no Chinese text detected')
+              bf = sum(1 for l in before.splitlines() if fence.match(l))
+              af = sum(1 for l in after.splitlines() if fence.match(l))
+              if bf != af:
+                  failures.append(f'{rel}: fenced-code marker count changed ({bf} -> {af})')
+              if url.findall(before) != url.findall(after):
+                  failures.append(f'{rel}: URL sequence changed')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print(f'validated {len(TARGETS)} translated files')
+          PY
+
+      - name: Commit translations and remove one-shot helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/translate_md_cn.py
+          rm -f .github/workflows/translate-cn.yml
+          rm -f .github/workflows/translate-cn-v2.yml
+          rm -f .github/workflows/cleanup-cn-translation.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && { echo 'No changes produced'; exit 1; }
+          git commit -m 'docs: translate remaining historical Markdown to Simplified Chinese'
+          git push origin HEAD:cn
