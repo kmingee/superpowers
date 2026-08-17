@@ -1,55 +1,52 @@
 ---
-name: Bug Report
-about: Something isn't working as expected
+name: Bug 报告
+about: 某些功能未按预期工作
 labels: bug
 ---
 
 <!--
-BEFORE FILING: Search open AND closed issues. The Windows SessionStart
-hook alone has been reported 29 times. If your issue already exists,
-add a comment or reaction to the existing one instead.
+提交之前：请搜索开放和已关闭的 issue。仅 Windows SessionStart hook
+这一项就已经被报告过 29 次。如果你的问题已经存在，请在已有 issue
+中添加评论或 reaction，而不是重复创建。
 -->
 
-- [ ] I searched existing issues and this is not a duplicate
+- [ ] 我已搜索现有 issue，确认这不是重复报告
 
-## Environment (required)
-<!-- Required. We assume an agent filed this report — tell us which one and
-     where it ran. We weigh reports by what produced them. -->
+## 环境（必填）
+<!-- 必填。我们默认这份报告由智能体提交——请说明是哪一个智能体，以及
+     它在哪里运行。我们会根据报告是如何产生的来衡量其可信度。 -->
 
-| Field | Value |
+| 字段 | 值 |
 |-------|-------|
-| Superpowers version | |
-| Harness (Claude Code, Cursor, etc.) | |
-| Harness version | |
-| Your model + version | |
-| All plugins installed | |
-| OS + shell | |
+| Superpowers 版本 | |
+| 运行环境（Claude Code、Cursor 等） | |
+| 运行环境版本 | |
+| 你的模型 + 版本 | |
+| 所有已安装插件 | |
+| 操作系统 + shell | |
 
-## Is this a Superpowers issue or a platform issue?
-<!-- Superpowers is a plugin. Some reported "bugs" are actually issues
-     in the underlying platform or model. If you're not sure, try
-     reproducing without Superpowers installed.
+## 这是 Superpowers 的问题还是平台问题？
+<!-- Superpowers 是一个插件。有些被报告为“bug”的问题实际上来自
+     底层平台或模型。如果不确定，请尝试在不安装 Superpowers 的情况下复现。
 
-     If the problem persists without Superpowers, file the issue with
-     your platform instead. -->
+     如果没有 Superpowers 时问题仍然存在，请向对应平台报告。 -->
 
-- [ ] I confirmed this issue does not occur without Superpowers installed
+- [ ] 我已确认未安装 Superpowers 时不会出现此问题
 
-## What happened?
-<!-- Be specific. "It doesn't work" is not a bug report. -->
+## 发生了什么？
+<!-- 请具体说明。“它不能用”不算 bug 报告。 -->
 
-## Steps to reproduce
+## 复现步骤
 1.
 2.
 3.
 
-## Expected behavior
-<!-- What should have happened? -->
+## 预期行为
+<!-- 原本应该发生什么？ -->
 
-## Actual behavior
-<!-- What happened instead? -->
+## 实际行为
+<!-- 实际发生了什么？ -->
 
-## Debug log or conversation transcript
-<!-- A debug log or conversation transcript showing the issue is the
-     single most helpful thing you can include. Without one, we're
-     guessing. Screenshots of error output are also useful. -->
+## 调试日志或对话记录
+<!-- 展示问题的调试日志或对话记录，是你能提供的最有帮助的信息。
+     如果没有这些信息，我们只能猜测。错误输出截图同样有帮助。 -->
