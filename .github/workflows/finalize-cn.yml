@@ -1,0 +1,125 @@
+name: Finalize cn translation branch
+
+on:
+  push:
+    branches:
+      - cn
+    paths:
+      - '.github/workflows/finalize-cn.yml'
+      - 'scripts/translate_md_cn.py'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.repository == 'kmingee/superpowers'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out cn
+        uses: actions/checkout@v4
+        with:
+          ref: cn
+          fetch-depth: 0
+
+      - name: Determine whether cleanup is complete
+        id: ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -e scripts/translate_md_cn.py || -e .github/workflows/translate-cn.yml || -e .github/workflows/cleanup-cn-translation.yml ]]; then
+            echo 'ready=no' >> "$GITHUB_OUTPUT"
+            echo 'Translation/cleanup still in progress; finalizer will run again after helper deletion.'
+          else
+            echo 'ready=yes' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate complete Chinese Markdown tree
+        if: steps.ready.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          BASE="$(git merge-base HEAD origin/main)"
+          echo "$BASE" > /tmp/cn-base
+
+          # The final diff must contain Markdown only.
+          non_md="$(git diff --name-only "$BASE"..HEAD | grep -Ev '\.md$' || true)"
+          if [[ -n "$non_md" ]]; then
+            echo 'Unexpected non-Markdown changes:'
+            echo "$non_md"
+            exit 1
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+
+          base = Path('/tmp/cn-base').read_text().strip()
+          files = subprocess.check_output(['git', 'ls-files', '*.md'], text=True).splitlines()
+          if len(files) != 94:
+              raise SystemExit(f'Expected 94 Markdown files, found {len(files)}')
+
+          intentionally_unchanged = {'AGENTS.md', 'GEMINI.md'}
+          cjk = re.compile(r'[\u3400-\u9fff]')
+          fence = re.compile(r'^\s*(```|~~~)')
+          url = re.compile(r'https?://[^\s)>\]]+')
+          failures = []
+
+          for rel in files:
+              after = Path(rel).read_text(encoding='utf-8')
+              before = subprocess.check_output(['git', 'show', f'{base}:{rel}'], text=True)
+
+              if rel in intentionally_unchanged:
+                  if after != before:
+                      failures.append(f'{rel}: expected structural pointer/symlink content to remain unchanged')
+                  continue
+
+              if subprocess.run(['git', 'diff', '--quiet', base, '--', rel]).returncode == 0:
+                  failures.append(f'{rel}: was not translated')
+              if not cjk.search(after):
+                  failures.append(f'{rel}: no Chinese text detected')
+
+              before_fences = sum(1 for line in before.splitlines() if fence.match(line))
+              after_fences = sum(1 for line in after.splitlines() if fence.match(line))
+              if before_fences != after_fences:
+                  failures.append(f'{rel}: fenced-code marker count changed ({before_fences} -> {after_fences})')
+
+              if url.findall(before) != url.findall(after):
+                  failures.append(f'{rel}: URL sequence changed')
+
+          if failures:
+              raise SystemExit('\n'.join(failures))
+
+          # Preserve the AGENTS.md symlink mode.
+          mode = subprocess.check_output(['git', 'ls-files', '-s', 'AGENTS.md'], text=True).split()[0]
+          if mode != '120000':
+              raise SystemExit(f'AGENTS.md mode changed: {mode}')
+
+          print('Validated 94 Markdown files: 92 translated, 2 structural pointer files unchanged.')
+          PY
+
+      - name: Squash cn to one clean commit and remove finalizer
+        if: steps.ready.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$(cat /tmp/cn-base)"
+          rm -f .github/workflows/finalize-cn.yml
+          git add -A
+
+          # Reconfirm no temporary/non-Markdown files survive in the final tree.
+          non_md="$(git diff --cached --name-only "$BASE" | grep -Ev '\.md$' || true)"
+          if [[ -n "$non_md" ]]; then
+            # The only staged non-Markdown change at this point should be deletion of this workflow,
+            # but it did not exist at BASE, so it must not appear in the BASE-to-index diff.
+            echo 'Unexpected final non-Markdown changes:'
+            echo "$non_md"
+            exit 1
+          fi
+
+          TREE="$(git write-tree)"
+          NEW_COMMIT="$(printf '%s\n' 'docs: translate all Markdown to Simplified Chinese' | git commit-tree "$TREE" -p "$BASE")"
+          git reset --hard "$NEW_COMMIT"
+          git push --force origin HEAD:cn
+          echo "Final cn commit: $NEW_COMMIT"
