@@ -1,56 +1,55 @@
-# Hermes Agent Tool Mapping
+# Hermes Agent 工具映射
 
-Skills speak in actions ("dispatch a subagent", "create a todo", "read a file"). On Hermes Agent these resolve to the tools below.
+技能用动作描述需求（“派发子智能体”“创建待办事项”“读取文件”）。在 Hermes Agent 中，这些动作对应下面的工具。
 
-## Tools
+## 工具
 
-| Action skills request | Hermes tool |
+| 技能请求的动作 | Hermes 工具 |
 |---|---|
-| Read a file | `read_file` |
-| Create a new file | `write_file` |
-| Edit a file (targeted patch) | `patch` |
-| Run a shell command | `terminal` |
-| Search file contents | `search_files` |
-| Find files by name | `terminal` with `find` |
-| Fetch a URL / read a webpage | `web_extract(urls=[...])` |
-| Search the web | `web_search(query=...)` |
-| Dispatch a subagent | `delegate_task(goal=..., context=..., toolsets=[...], role="leaf")` |
-| Task tracking | `todo` tool |
-| Invoke a skill | `skill_view("skill-name")` |
+| 读取文件 | `read_file` |
+| 创建新文件 | `write_file` |
+| 编辑文件（定向 patch） | `patch` |
+| 运行 shell 命令 | `terminal` |
+| 搜索文件内容 | `search_files` |
+| 按名称查找文件 | 通过 `terminal` 使用 `find` |
+| 获取 URL / 读取网页 | `web_extract(urls=[...])` |
+| 搜索网页 | `web_search(query=...)` |
+| 派发子智能体 | `delegate_task(goal=..., context=..., toolsets=[...], role="leaf")` |
+| 任务跟踪 | `todo` 工具 |
+| 调用技能 | `skill_view("skill-name")` |
 
-## Instructions file
+## 指令文件
 
-When a skill mentions "your instructions file," on Hermes Agent this is **`AGENTS.md`** in the project directory, or **`SOUL.md`** globally at `~/.hermes/SOUL.md`.
+当技能提到“你的指令文件”时，在 Hermes Agent 中指的是项目目录下的 **`AGENTS.md`**，或全局的 **`SOUL.md`**（`~/.hermes/SOUL.md`）。
 
-## Invoking a skill
+## 调用技能
 
-Hermes Agent has a `skills` toolset with `skill_view` and `skills_list` tools.
-To invoke a superpowers skill, use:
+Hermes Agent 有一个 `skills` 工具集，其中包含 `skill_view` 和 `skills_list`。
+调用 Superpowers 技能时使用：
 
 ```
 skill_view("brainstorming")
 skill_view("test-driven-development")
 ```
 
-If `skill_view` cannot find a superpowers skill (it may not appear in the catalog
-until the plugin fully registers it), fall back to reading the SKILL.md directly:
+如果 `skill_view` 找不到某个 Superpowers 技能（插件完全注册之前，它可能尚未出现在目录中），请回退为直接读取 SKILL.md：
 
 ```
 read_file(path="~/.hermes/plugins/superpowers/skills/<skill-name>/SKILL.md")
 ```
 
-This fallback is the same mechanism used by other harnesses without native skill loading.
+这与其他不支持原生技能加载的运行环境所采用的回退机制相同。
 
-## Subagent dispatch
+## 派发子智能体
 
-Use `delegate_task` to spawn isolated subagents for parallel or sequential workstreams:
+使用 `delegate_task` 创建隔离子智能体，用于并行或顺序工作流：
 
 ```
 delegate_task(goal="...", context="...", toolsets=[...], role="leaf")
 ```
 
-If `delegate_task` is unavailable, do the work inline rather than inventing tool calls.
+如果 `delegate_task` 不可用，就在当前会话内完成工作，不要编造不存在的工具调用。
 
-## Task tracking
+## 任务跟踪
 
-Use the `todo` tool for task tracking within a session. For multi-agent task boards, use `hermes kanban` CLI if available. Treat older `TodoWrite` references as the task-tracking action.
+使用 `todo` 工具跟踪单次会话中的任务。多智能体任务看板如果可用，可以使用 `hermes kanban` CLI。较旧内容中的 `TodoWrite` 应理解为这里的任务跟踪动作。
