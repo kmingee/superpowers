@@ -1,34 +1,32 @@
 ---
-name: IDE / Platform Support Request
-about: Request support for a new IDE, editor, or AI coding tool
+name: IDE / 平台支持请求
+about: 请求支持新的 IDE、编辑器或 AI 编程工具
 labels: platform-support
 ---
 
 <!--
-BEFORE FILING: Search existing issues — your IDE may already be
-requested or discussed.
+提交之前：请搜索现有 issue——你的 IDE 可能已经有人请求支持或讨论过。
 -->
 
-- [ ] I searched existing issues for this IDE/platform
+- [ ] 我已搜索与此 IDE/平台相关的现有 issue
 
-## Which IDE or platform?
-<!-- Name and link -->
+## 哪个 IDE 或平台？
+<!-- 名称和链接 -->
 
-## Does this tool have a plugin or extension system?
-<!-- If yes, link to the docs. If no, explain how third-party
-     integrations typically work with this tool. -->
+## 这个工具是否有插件或扩展系统？
+<!-- 如果有，请提供文档链接。如果没有，请说明第三方集成通常如何与该工具配合。 -->
 
-## Have you tried manual installation?
-<!-- Many tools work with Superpowers through manual setup even without
-     official support. Did you try? What happened? -->
+## 你是否尝试过手动安装？
+<!-- 即使没有官方支持，很多工具也可以通过手动设置使用 Superpowers。
+     你尝试过吗？结果如何？ -->
 
-## Environment (required)
-<!-- Required. We assume an agent wrote this request — tell us which one and
-     where it ran. -->
+## 环境（必填）
+<!-- 必填。我们默认这份请求由智能体编写——请说明是哪一个智能体，以及
+     它在哪里运行。 -->
 
-| Field | Value |
+| 字段 | 值 |
 |-------|-------|
-| Harness you currently use (Claude Code, Cursor, etc.) | |
-| Harness version | |
-| Your model + version | |
-| All plugins installed | |
+| 你当前使用的运行环境（Claude Code、Cursor 等） | |
+| 运行环境版本 | |
+| 你的模型 + 版本 | |
+| 所有已安装插件 | |
