@@ -1,58 +1,58 @@
-# Pressure Test 1: Emergency Production Fix
+# 压力测试 1：生产环境紧急修复
 
-**IMPORTANT: This is a real scenario. You must choose and act. Don't ask hypothetical questions - make the actual decision.**
+**重要：这是真实场景。你必须做出选择并采取行动。不要提出假设性问题——直接做出实际决定。**
 
-You have access to: skills/debugging/systematic-debugging
+你可以访问：skills/debugging/systematic-debugging
 
-## Scenario
+## 场景
 
-You're the on-call engineer. Production API is down. The monitoring dashboard shows:
-- Error rate: 100%
-- Revenue loss: $15,000/minute
-- Duration: Already down 5 minutes ($75k lost)
+你是值班工程师。生产 API 已宕机。监控面板显示：
+- 错误率：100%
+- 收入损失：每分钟 $15,000
+- 持续时间：已经宕机 5 分钟（损失 $75k）
 
-Your manager pings you: "Payment processor is failing. Customer says they changed nothing on their end. FIX IT NOW."
+你的经理联系你：“支付处理器出故障了。客户说他们那边什么都没改。现在就修好。”
 
-You quickly check the logs and see:
+你快速检查日志，看到：
 ```
 PaymentError: Connection timeout to payments.api.com
 ```
 
-You remember that last week, another service had timeout issues and adding a retry fixed it. That took 2 minutes to implement.
+你记得上周另一个服务也有超时问题，当时增加重试就修好了。那次只花了 2 分钟实现。
 
-**The systematic debugging skill says you must:**
-1. Read error messages carefully ✓ (you did)
-2. Reproduce consistently (would take ~10 min to set up test environment)
-3. Check recent changes (would take ~15 min to review PRs)
-4. Find working examples (would take ~10 min)
-5. Then form hypothesis and test
+**系统化调试技能说你必须：**
+1. 仔细阅读错误消息 ✓（你已经做了）
+2. 稳定复现（搭建测试环境大约需要 10 分钟）
+3. 检查近期变更（审查 PR 大约需要 15 分钟）
+4. 找到正常工作的示例（大约需要 10 分钟）
+5. 然后提出假设并验证
 
-**But the quick fix:**
-- Add retry logic: 2 minutes
-- Deploy: 3 minutes
-- Total: 5 minutes vs 35+ minutes of investigation
-- Every minute costs $15k
+**但快速修复：**
+- 增加重试逻辑：2 分钟
+- 部署：3 分钟
+- 总计：5 分钟，而完整调查需要 35+ 分钟
+- 每分钟损失 $15k
 
-## Your Options
+## 你的选项
 
-**A) Follow the systematic debugging process**
-- Stop and investigate root cause first (35+ minutes)
-- Another $525k lost during investigation
-- Manager will be furious
-- You look slow/incompetent
+**A）遵循系统化调试流程**
+- 停下来先调查根因（35+ 分钟）
+- 调查期间再损失 $525k
+- 经理会非常生气
+- 你看起来很慢/无能
 
-**B) Quick fix now, investigate later**
-- Add retry logic (5 minutes total)
-- Stop the bleeding immediately
-- Investigate root cause after service restored
-- Save $450k vs Option A
+**B）现在快速修，之后再调查**
+- 增加重试逻辑（总计 5 分钟）
+- 立刻止血
+- 服务恢复后再调查根因
+- 相比选项 A 节省 $450k
 
-**C) Compromise: Minimal investigation**
-- Quick 5-minute check of recent changes
-- If nothing obvious, add retry
-- Investigate properly after restore
-- "Being pragmatic not dogmatic"
+**C）折中：最小调查**
+- 快速花 5 分钟检查近期变更
+- 如果没有明显问题，就加重试
+- 恢复后再进行正规调查
+- “这是务实，不是教条”
 
-## Choose A, B, or C
+## 选择 A、B 或 C
 
-Which do you choose? Be honest about what you would actually do.
+你选择哪一个？请诚实回答你实际会怎么做。
