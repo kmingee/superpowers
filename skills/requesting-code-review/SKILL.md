@@ -1,51 +1,51 @@
 ---
 name: requesting-code-review
-description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+description: 当完成任务、实现重大功能或准备合并之前，用于验证工作是否符合要求
 ---
 
-# Requesting Code Review
+# 请求代码审查
 
-Dispatch a code reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history.
+派发一个代码审查子智能体，在问题扩散之前把它们找出来。审查者应获得为评估精确构造的上下文——绝不要把你当前会话的历史交给它。
 
-**Core principle:** Review early, review often.
+**核心原则：** 尽早审查，经常审查。
 
-## When to Request Review
+## 何时请求审查
 
-**Mandatory:**
-- After each task in subagent-driven development
-- After completing major feature
-- Before merge to main
+**强制：**
+- 子智能体驱动开发中的每一项任务完成后
+- 重大功能完成后
+- 合并到 main 之前
 
-**Optional but valuable:**
-- When stuck (fresh perspective)
-- Before refactoring (baseline check)
-- After fixing complex bug
+**可选但很有价值：**
+- 卡住时（获得全新视角）
+- 重构前（检查基线）
+- 修复复杂 bug 后
 
-## How to Request
+## 如何请求
 
-**1. Get git SHAs:**
+**1. 获取 git SHA：**
 ```bash
 BASE_SHA=$(git rev-parse HEAD~1)  # or origin/main
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
-**2. Dispatch code reviewer subagent:**
+**2. 派发代码审查子智能体：**
 
-Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md](code-reviewer.md)
+派发一个 `general-purpose` 子智能体，并填写 [code-reviewer.md](code-reviewer.md) 中的模板。
 
-**Placeholders:**
-- `{DESCRIPTION}` - Brief summary of what you built
-- `{PLAN_OR_REQUIREMENTS}` - What it should do
-- `{BASE_SHA}` - Starting commit
-- `{HEAD_SHA}` - Ending commit
+**占位符：**
+- `{DESCRIPTION}` - 你构建内容的简要摘要
+- `{PLAN_OR_REQUIREMENTS}` - 它应该完成什么
+- `{BASE_SHA}` - 起始提交
+- `{HEAD_SHA}` - 结束提交
 
-**3. Act on feedback:**
-- Fix Critical issues immediately
-- Fix Important issues before proceeding
-- Note Minor issues for later
-- Push back if reviewer is wrong (with reasoning)
+**3. 处理反馈：**
+- 立即修复 Critical 问题
+- 继续之前修复 Important 问题
+- Minor 问题记录下来以后处理
+- 如果审查者错了，用技术理由反驳
 
-## Example
+## 示例
 
 ```
 [Just completed Task 2: Add verification function]
@@ -72,24 +72,24 @@ You: [Fix progress indicators]
 [Continue to Task 3]
 ```
 
-## Common Rationalizations
+## 常见合理化借口
 
-| Excuse | Reality |
+| 借口 | 事实 |
 |--------|---------|
-| "I'll just review the diff myself instead of dispatching a reviewer" | You're the coordinator — reviewing the diff inline burns the context window you need to keep driving the work. Dispatch a reviewer subagent: the diff and the evaluation live in its context, and only the findings come back to you. |
-| "The reviewer needs my whole session history to understand the change" | Hand it precisely crafted context, never your session's history. That keeps the reviewer on the work product, not your thought process. |
+| “我自己看一下 diff 就行，不用派审查者” | 你是协调者——在当前上下文里审 diff 会消耗继续驱动工作的上下文窗口。派一个审查子智能体：diff 和评估留在它的上下文中，只把发现带回来。 |
+| “审查者需要我整段会话历史才能理解改动” | 给它精确构造的上下文，绝不要给会话历史。这样审查者会聚焦工作产物，而不是你的思考过程。 |
 
-## Red Flags
+## 危险信号
 
-**Never:**
-- Skip review because "it's simple"
-- Ignore Critical issues
-- Proceed with unfixed Important issues
-- Argue with valid technical feedback
+**绝不要：**
+- 因为“很简单”就跳过审查
+- 忽略 Critical 问题
+- Important 问题未修复就继续
+- 与有效的技术反馈争辩
 
-**If reviewer wrong:**
-- Push back with technical reasoning
-- Show code/tests that prove it works
-- Request clarification
+**如果审查者错了：**
+- 用技术理由反驳
+- 展示证明代码有效的代码/测试
+- 请求澄清
 
-See template at: [code-reviewer.md](code-reviewer.md)
+模板见：[code-reviewer.md](code-reviewer.md)
