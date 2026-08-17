@@ -1,711 +1,357 @@
-# Skills Improvements from User Feedback
+# 根据用户反馈改进技能
 
-**Date:** 2025-11-28
-**Status:** Draft
-**Source:** Two Claude instances using superpowers in real development scenarios
+**日期：** 2025-11-28
+**状态：** 计划
 
----
+## 概述
 
-## Executive Summary
+本计划根据真实世界中的用户体验和失败模式，改进多个 Superpowers 技能。重点不是增加新功能，而是降低认知摩擦、改进指令清晰度，并防止智能体在高压工作流中做出常见错误。
 
-Two Claude instances provided detailed feedback from actual development sessions. Their feedback reveals **systematic gaps** in current skills that allowed preventable bugs to ship despite following the skills.
+## 反馈主题
 
-**Critical insight:** These are problem reports, not just solution proposals. The problems are real; the solutions need careful evaluation.
+用户反馈反复暴露出几个模式：
 
-**Key themes:**
-1. **Verification gaps** - We verify operations succeed but not that they achieve intended outcomes
-2. **Process hygiene** - Background processes accumulate and interfere across subagents
-3. **Context optimization** - Subagents get too much irrelevant information
-4. **Self-reflection missing** - No prompt to critique own work before handoff
-5. **Mock safety** - Mocks can drift from interfaces without detection
-6. **Skill activation** - Skills exist but aren't being read/used
+1. **技能调用时机仍然不够明确**——智能体知道技能存在，却会在开始工作后才想起调用。
+2. **部分技能之间的边界不够清楚**——特别是 brainstorming、writing-plans、executing-plans 和 subagent-driven-development。
+3. **完成声明过早**——即使没有运行验证命令，也会因为“看起来正确”而声称完成。
+4. **代码审查容易变成礼貌性赞同**——收到反馈时没有先验证技术正确性。
+5. **并行子智能体使用不足**——多个独立问题仍按顺序处理。
+6. **worktree 工作流不够可靠**——尤其是在目录选择、ignore 验证和清理方面。
 
----
+## 目标
 
-## Problems Identified
+- 让技能触发条件更加具体、可发现。
+- 让技能之间的交接点明确且不可绕过。
+- 用强约束语言替代模糊建议。
+- 在技能中加入真实合理化借口和对应反制。
+- 保持内容简洁，不通过重复叙述增加 token 成本。
 
-### Problem 1: Configuration Change Verification Gap
+## 非目标
 
-**What happened:**
-- Subagent tested "OpenAI integration"
-- Set `OPENAI_API_KEY` env var
-- Got status 200 responses
-- Reported "OpenAI integration working"
-- **BUT** response contained `"model": "claude-sonnet-4-20250514"` - was actually using Anthropic
-
-**Root cause:**
-`verification-before-completion` checks operations succeed but not that outcomes reflect intended configuration changes.
-
-**Impact:** High - False confidence in integration tests, bugs ship to production
-
-**Example failure pattern:**
-- Switch LLM provider → verify status 200 but don't check model name
-- Enable feature flag → verify no errors but don't check feature is active
-- Change environment → verify deployment succeeds but don't check environment vars
+- 不重构整个技能目录结构。
+- 不引入新的运行时依赖。
+- 不把所有技能改成完全相同的模板。
+- 不用文档解决可以通过自动化/工具本身强制的问题。
 
 ---
 
-### Problem 2: Background Process Accumulation
+## 1. using-superpowers
 
-**What happened:**
-- Multiple subagents dispatched during session
-- Each started background server processes
-- Processes accumulated (4+ servers running)
-- Stale processes still bound to ports
-- Later E2E test hit stale server with wrong config
-- Confusing/incorrect test results
+### 问题
 
-**Root cause:**
-Subagents are stateless - don't know about previous subagents' processes. No cleanup protocol.
+当前版本说明了“先检查技能”，但仍有智能体会先探索代码、读取文件或提澄清问题，再决定是否调用技能。这说明“技能检查发生在任何行动之前”需要更明确。
 
-**Impact:** Medium-High - Tests hit wrong server, false passes/failures, debugging confusion
+### 改进
 
----
+- 把规则提升为最前面的强约束。
+- 明确“回复、提问、读取文件、搜索仓库”都属于行动。
+- 增加 1% 适用概率规则：只要有很小可能适用，就必须调用。
+- 加入合理化借口表，覆盖：
+  - “这只是简单问题”
+  - “我需要先了解上下文”
+  - “先快速看一下文件”
+  - “我记得这个技能，不必重新读”
 
-### Problem 3: Context Bloat in Subagent Prompts
+### 验收
 
-**What happened:**
-- Standard approach: give subagent full plan file to read
-- Experiment: give only task + pattern + file + verify command
-- Result: Faster, more focused, single-attempt completion more common
-
-**Root cause:**
-Subagents waste tokens and attention on irrelevant plan sections.
-
-**Impact:** Medium - Slower execution, more failed attempts
-
-**What worked:**
-```
-You are adding a single E2E test to packnplay's test suite.
-
-**Your task:** Add `TestE2E_FeaturePrivilegedMode` to `pkg/runner/e2e_test.go`
-
-**What to test:** A local devcontainer feature that requests `"privileged": true`
-in its metadata should result in the container running with `--privileged` flag.
-
-**Follow the exact pattern of TestE2E_FeatureOptionValidation** (at the end of the file)
-
-**After writing, run:** `go test -v ./pkg/runner -run TestE2E_FeaturePrivilegedMode -timeout 5m`
-```
+在压力测试中，即使用户要求“直接做，不要走流程”，只要存在适用技能，智能体仍会先调用技能。
 
 ---
 
-### Problem 4: No Self-Reflection Before Handoff
+## 2. brainstorming
 
-**What happened:**
-- Added self-reflection prompt: "Look at your work with fresh eyes - what could be better?"
-- Implementer for Task 5 identified failing test was due to implementation bug, not test bug
-- Traced to line 99: `strings.Join(metadata.Entrypoint, " ")` creating invalid Docker syntax
-- Without self-reflection, would have just reported "test fails" without root cause
+### 问题
 
-**Root cause:**
-Implementers don't naturally step back and critique their own work before reporting completion.
+智能体有时把 brainstorming 当作“可选的需求讨论”，尤其是任务看起来简单时。这导致没有明确设计批准就直接实现。
 
-**Impact:** Medium - Bugs handed off to reviewer that implementer could have caught
+### 改进
 
----
+- 增加硬关卡：在设计被明确批准之前，不得调用实现技能或写代码。
+- 强调简单任务也需要设计，只是设计可以很短。
+- 每次只提出一个澄清问题。
+- 在方案比较中明确给出 2–3 种选择和推荐理由。
+- 完成设计后明确交接到 writing-plans。
 
-### Problem 5: Mock-Interface Drift
+### 验收
 
-**What happened:**
-```typescript
-// Interface defines close()
-interface PlatformAdapter {
-  close(): Promise<void>;
-}
-
-// Code (BUGGY) calls cleanup()
-await adapter.cleanup();
-
-// Mock (MATCHES BUG) defines cleanup()
-vi.mock('web-adapter', () => ({
-  WebAdapter: vi.fn().mockImplementation(() => ({
-    cleanup: vi.fn().mockResolvedValue(undefined),  // Wrong!
-  })),
-}));
-```
-- Tests passed
-- Runtime crashed: "adapter.cleanup is not a function"
-
-**Root cause:**
-Mock derived from what buggy code calls, not from interface definition. TypeScript can't catch inline mocks with wrong method names.
-
-**Impact:** High - Tests give false confidence, runtime crashes
-
-**Why testing-anti-patterns didn't prevent this:**
-The skill covers testing mock behavior and mocking without understanding, but not the specific pattern of "derive mock from interface, not implementation."
+给定“只是加一个小按钮，直接改吧”这类提示时，智能体仍先给出简短设计并等待批准。
 
 ---
 
-### Problem 6: Code Reviewer File Access
+## 3. writing-plans
 
-**What happened:**
-- Code reviewer subagent dispatched
-- Couldn't find test file: "The file doesn't appear to exist in the repository"
-- File actually exists
-- Reviewer didn't know to explicitly read it first
+### 问题
 
-**Root cause:**
-Reviewer prompts don't include explicit file reading instructions.
+计划有时太高层，出现“添加验证”“写测试”“处理错误”等无法直接执行的占位描述。执行者需要重新做设计判断。
 
-**Impact:** Low-Medium - Reviews fail or incomplete
+### 改进
 
----
+- 每个步骤控制在约 2–5 分钟，并只做一个动作。
+- 对代码步骤给出实际代码，而不是抽象描述。
+- 文件路径、测试命令、预期失败/通过结果必须具体。
+- 明确禁止 TBD、TODO、“类似 Task N”等占位写法。
+- 强调 DRY、YAGNI、TDD 和频繁提交。
 
-### Problem 7: Fix Workflow Latency
+### 验收
 
-**What happened:**
-- Implementer identifies bug during self-reflection
-- Implementer knows the fix
-- Current workflow: report → I dispatch fixer → fixer fixes → I verify
-- Extra round-trip adds latency without adding value
-
-**Root cause:**
-Rigid separation between implementer and fixer roles when implementer has already diagnosed.
-
-**Impact:** Low - Latency, but no correctness issue
+让一个对代码库没有上下文的新智能体读取计划时，它可以直接执行，而不需要猜测接口或补设计。
 
 ---
 
-### Problem 8: Skills Not Being Read
+## 4. executing-plans
 
-**What happened:**
-- `testing-anti-patterns` skill exists
-- Neither human nor subagents read it before writing tests
-- Would have prevented some issues (though not all - see Problem 5)
+### 问题
 
-**Root cause:**
-No enforcement that subagents read relevant skills. No prompt includes skill reading.
+执行计划时，智能体可能在遇到不清楚之处后自行猜测，或者在没有完整验证的情况下继续下一批任务。
 
-**Impact:** Medium - Skill investment wasted if not used
+### 改进
 
----
+- 开始前强制审查计划。
+- 存在关键疑问时必须停止并询问。
+- 每个任务标记 in_progress / completed。
+- 严格按计划执行验证。
+- 全部完成后强制交接到 finishing-a-development-branch。
 
-## Proposed Improvements
+### 验收
 
-### 1. verification-before-completion: Add Configuration Change Verification
-
-**Add new section:**
-
-```markdown
-## Verifying Configuration Changes
-
-When testing changes to configuration, providers, feature flags, or environment:
-
-**Don't just verify the operation succeeded. Verify the output reflects the intended change.**
-
-### Common Failure Pattern
-
-Operation succeeds because *some* valid config exists, but it's not the config you intended to test.
-
-### Examples
-
-| Change | Insufficient | Required |
-|--------|-------------|----------|
-| Switch LLM provider | Status 200 | Response contains expected model name |
-| Enable feature flag | No errors | Feature behavior actually active |
-| Change environment | Deploy succeeds | Logs/vars reference new environment |
-| Set credentials | Auth succeeds | Authenticated user/context is correct |
-
-### Gate Function
-
-```
-BEFORE claiming configuration change works:
-
-1. IDENTIFY: What should be DIFFERENT after this change?
-2. LOCATE: Where is that difference observable?
-   - Response field (model name, user ID)
-   - Log line (environment, provider)
-   - Behavior (feature active/inactive)
-3. RUN: Command that shows the observable difference
-4. VERIFY: Output contains expected difference
-5. ONLY THEN: Claim configuration change works
-
-Red flags:
-  - "Request succeeded" without checking content
-  - Checking status code but not response body
-  - Verifying no errors but not positive confirmation
-```
-
-**Why this works:**
-Forces verification of INTENT, not just operation success.
+当计划存在缺失依赖或含糊指令时，智能体停止并请求澄清，而不是“做最合理的假设”。
 
 ---
 
-### 2. subagent-driven-development: Add Process Hygiene for E2E Tests
+## 5. subagent-driven-development
 
-**Add new section:**
+### 问题
 
-```markdown
-## Process Hygiene for E2E Tests
+子智能体驱动开发容易出现三类问题：
 
-When dispatching subagents that start services (servers, databases, message queues):
+1. 实现者继承太多上下文，导致注意力被污染。
+2. Reviewer 只看实现者报告，而不独立检查代码。
+3. 任务之间虽然有 review，但 review 顺序和职责不够清晰。
 
-### Problem
+### 改进
 
-Subagents are stateless - they don't know about processes started by previous subagents. Background processes persist and can interfere with later tests.
+- 每个任务使用全新实现者子智能体。
+- 实现者获得完整任务文本和必要上下文，但不继承主会话历史。
+- 实现者完成后先自我审查。
+- 第一层 reviewer 验证规格符合性：不多、不少、没有误解。
+- 第二层 reviewer 验证代码质量：可维护性、测试、错误处理。
+- 两层都通过前不得进入下一任务。
+- Reviewer 必须独立读取代码，不得只相信实现者报告。
 
-### Solution
+### 验收
 
-**Before dispatching E2E test subagent, include cleanup in prompt:**
-
-```
-BEFORE starting any services:
-1. Kill existing processes: pkill -f "<service-pattern>" 2>/dev/null || true
-2. Wait for cleanup: sleep 1
-3. Verify port free: lsof -i :<port> && echo "ERROR: Port still in use" || echo "Port free"
-
-AFTER tests complete:
-1. Kill the process you started
-2. Verify cleanup: pgrep -f "<service-pattern>" || echo "Cleanup successful"
-```
-
-### Example
-
-```
-Task: Run E2E test of API server
-
-Prompt includes:
-"Before starting the server:
-- Kill any existing servers: pkill -f 'node.*server.js' 2>/dev/null || true
-- Verify port 3001 is free: lsof -i :3001 && exit 1 || echo 'Port available'
-
-After tests:
-- Kill the server you started
-- Verify: pgrep -f 'node.*server.js' || echo 'Cleanup verified'"
-```
-
-### Why This Matters
-
-- Stale processes serve requests with wrong config
-- Port conflicts cause silent failures
-- Process accumulation slows system
-- Confusing test results (hitting wrong server)
-```
-
-**Trade-off analysis:**
-- Adds boilerplate to prompts
-- But prevents very confusing debugging
-- Worth it for E2E test subagents
+测试计划包含故意遗漏的要求时，规格 reviewer 能发现缺口；代码质量 reviewer 不会用“实现者说测试通过了”代替实际检查。
 
 ---
 
-### 3. subagent-driven-development: Add Lean Context Option
+## 6. requesting-code-review
 
-**Modify Step 2: Execute Task with Subagent**
+### 问题
 
-**Before:**
-```
-Read that task carefully from [plan-file].
-```
+智能体会把 code review 推迟到“大功能结束”，导致早期设计问题扩散。
 
-**After:**
-```
-## Context Approaches
+### 改进
 
-**Full Plan (default):**
-Use when tasks are complex or have dependencies:
-```
-Read Task N from [plan-file] carefully.
-```
+- 在子智能体开发中，每项任务后都必须请求审查。
+- 重大功能完成后必须审查。
+- 合并 main 前必须审查。
+- 审查提示词应提供 BASE_SHA、HEAD_SHA、需求和实现摘要。
+- 审查结果按 Critical / Important / Minor 分类。
 
-**Lean Context (for independent tasks):**
-Use when task is standalone and pattern-based:
-```
-You are implementing: [1-2 sentence task description]
+### 验收
 
-File to modify: [exact path]
-Pattern to follow: [reference to existing function/test]
-What to implement: [specific requirement]
-Verification: [exact command to run]
-
-[Do NOT include full plan file]
-```
-
-**Use lean context when:**
-- Task follows existing pattern (add similar test, implement similar feature)
-- Task is self-contained (doesn't need context from other tasks)
-- Pattern reference is sufficient (e.g., "follow TestE2E_FeatureOptionValidation")
-
-**Use full plan when:**
-- Task has dependencies on other tasks
-- Requires understanding of overall architecture
-- Complex logic that needs context
-```
-
-**Example:**
-```
-Lean context prompt:
-
-"You are adding a test for privileged mode in devcontainer features.
-
-File: pkg/runner/e2e_test.go
-Pattern: Follow TestE2E_FeatureOptionValidation (at end of file)
-Test: Feature with `"privileged": true` in metadata results in `--privileged` flag
-Verify: go test -v ./pkg/runner -run TestE2E_FeaturePrivilegedMode -timeout 5m
-
-Report: Implementation, test results, any issues."
-```
-
-**Why this works:**
-Reduces token usage, increases focus, faster completion when appropriate.
+即使任务“很简单”，智能体也不会跳过任务级 review。
 
 ---
 
-### 4. subagent-driven-development: Add Self-Reflection Step
+## 7. receiving-code-review
 
-**Modify Step 2: Execute Task with Subagent**
+### 问题
 
-**Add to prompt template:**
+收到 review 时，智能体容易表演式赞同：“You're absolutely right!”、“Great point!” 然后直接修改，而没有先验证反馈是否适用于当前代码库。
 
-```
-When done, BEFORE reporting back:
+### 改进
 
-Take a step back and review your work with fresh eyes.
+- 明确禁止表演式认同。
+- 先完整阅读并理解反馈。
+- 对照代码库验证技术正确性。
+- 不清楚时先澄清，不能部分实施。
+- 外部 reviewer 的建议保持怀疑性检查。
+- 对违反 YAGNI 或破坏兼容性的建议应技术性反驳。
 
-Ask yourself:
-- Does this actually solve the task as specified?
-- Are there edge cases I didn't consider?
-- Did I follow the pattern correctly?
-- If tests are failing, what's the ROOT CAUSE (implementation bug vs test bug)?
-- What could be better about this implementation?
+### 验收
 
-If you identify issues during this reflection, fix them now.
-
-Then report:
-- What you implemented
-- Self-reflection findings (if any)
-- Test results
-- Files changed
-```
-
-**Why this works:**
-Catches bugs implementer can find themselves before handoff. Documented case: identified entrypoint bug through self-reflection.
-
-**Trade-off:**
-Adds ~30 seconds per task, but catches issues before review.
+给出一个听起来合理但实际上会破坏旧版本兼容性的 review 建议时，智能体先验证并反驳，而不是立即实施。
 
 ---
 
-### 5. requesting-code-review: Add Explicit File Reading
+## 8. verification-before-completion
 
-**Modify the code-reviewer template:**
+### 问题
 
-**Add at the beginning:**
+“应该通过”“看起来修好了”这类措辞经常在真正运行验证之前出现。
 
-```markdown
-## Files to Review
+### 改进
 
-BEFORE analyzing, read these files:
+建立硬规则：
 
-1. [List specific files that changed in the diff]
-2. [Files referenced by changes but not modified]
-
-Use Read tool to load each file.
-
-If you cannot find a file:
-- Check exact path from diff
-- Try alternate locations
-- Report: "Cannot locate [path] - please verify file exists"
-
-DO NOT proceed with review until you've read the actual code.
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
 ```
 
-**Why this works:**
-Explicit instruction prevents "file not found" issues.
+声明任何状态之前必须：
+
+1. 识别能证明声明的命令。
+2. 运行完整命令。
+3. 阅读完整输出和退出码。
+4. 确认输出支持声明。
+5. 只有这时才能声称成功。
+
+覆盖测试、构建、lint、bug 修复、需求完成、子智能体工作等场景。
+
+### 验收
+
+如果没有运行当前验证命令，智能体不得说“完成”“修复了”“所有测试通过”。
 
 ---
 
-### 6. testing-anti-patterns: Add Mock-Interface Drift Anti-Pattern
+## 9. dispatching-parallel-agents
 
-**Add new Anti-Pattern 6:**
+### 问题
 
-```markdown
-## Anti-Pattern 6: Mocks Derived from Implementation
+多个独立失败经常被单个智能体串行排查，浪费时间和上下文。
 
-**The violation:**
-```typescript
-// Code (BUGGY) calls cleanup()
-await adapter.cleanup();
+### 改进
 
-// Mock (MATCHES BUG) has cleanup()
-const mock = {
-  cleanup: vi.fn().mockResolvedValue(undefined)
-};
+- 明确识别独立问题域。
+- 每个领域派一个子智能体。
+- 同一条回复中发出多个派发调用，以确保并行。
+- 子智能体提示词必须聚焦、自包含，并明确输出要求。
+- 集成时统一运行完整测试。
 
-// Interface (CORRECT) defines close()
-interface PlatformAdapter {
-  close(): Promise<void>;
-}
-```
+### 验收
 
-**Why this is wrong:**
-- Mock encodes the bug into the test
-- TypeScript can't catch inline mocks with wrong method names
-- Test passes because both code and mock are wrong
-- Runtime crashes when real object is used
-
-**The fix:**
-```typescript
-// ✅ GOOD: Derive mock from interface
-
-// Step 1: Open interface definition (PlatformAdapter)
-// Step 2: List methods defined there (close, initialize, etc.)
-// Step 3: Mock EXACTLY those methods
-
-const mock = {
-  initialize: vi.fn().mockResolvedValue(undefined),
-  close: vi.fn().mockResolvedValue(undefined),  // From interface!
-};
-
-// Now test FAILS because code calls cleanup() which doesn't exist
-// That failure reveals the bug BEFORE runtime
-```
-
-### Gate Function
-
-```
-BEFORE writing any mock:
-
-  1. STOP - Do NOT look at the code under test yet
-  2. FIND: The interface/type definition for the dependency
-  3. READ: The interface file
-  4. LIST: Methods defined in the interface
-  5. MOCK: ONLY those methods with EXACTLY those names
-  6. DO NOT: Look at what your code calls
-
-  IF your test fails because code calls something not in mock:
-    ✅ GOOD - The test found a bug in your code
-    Fix the code to call the correct interface method
-    NOT the mock
-
-  Red flags:
-    - "I'll mock what the code calls"
-    - Copying method names from implementation
-    - Mock written without reading interface
-    - "The test is failing so I'll add this method to the mock"
-```
-
-**Detection:**
-
-When you see runtime error "X is not a function" and tests pass:
-1. Check if X is mocked
-2. Compare mock methods to interface methods
-3. Look for method name mismatches
-```
-
-**Why this works:**
-Directly addresses the failure pattern from feedback.
+面对三个互不相关的测试文件失败时，智能体并行派发三个调查，而不是逐个处理。
 
 ---
 
-### 7. subagent-driven-development: Require Skills Reading for Test Subagents
+## 10. using-git-worktrees
 
-**Add to prompt template when task involves testing:**
+### 问题
 
-```markdown
-BEFORE writing any tests:
+手动创建 worktree 时容易出现：
 
-1. Read testing-anti-patterns skill:
-   Use Skill tool: superpowers:testing-anti-patterns
+- 选择错误目录
+- 忘记确认目录被 `.gitignore` 忽略
+- 没有运行依赖安装
+- 没有验证干净基线
 
-2. Apply gate functions from that skill when:
-   - Writing mocks
-   - Adding methods to production classes
-   - Mocking dependencies
+### 改进
 
-This is NOT optional. Tests that violate anti-patterns will be rejected in review.
-```
+- 优先使用已有 `.worktrees/`，其次 `worktrees/`。
+- 都不存在时检查 CLAUDE.md，再询问用户位置偏好。
+- 项目本地目录必须用 `git check-ignore` 验证。
+- 自动检测 package.json / Cargo.toml / requirements.txt / go.mod 并执行 setup。
+- 创建后运行项目测试，确认基线干净。
 
-**Why this works:**
-Ensures skills are actually used, not just exist.
+### 验收
 
-**Trade-off:**
-Adds time to each task, but prevents entire classes of bugs.
-
----
-
-### 8. subagent-driven-development: Allow Implementer to Fix Self-Identified Issues
-
-**Modify Step 2:**
-
-**Current:**
-```
-Subagent reports back with summary of work.
-```
-
-**Proposed:**
-```
-Subagent performs self-reflection, then:
-
-IF self-reflection identifies fixable issues:
-  1. Fix the issues
-  2. Re-run verification
-  3. Report: "Initial implementation + self-reflection fix"
-
-ELSE:
-  Report: "Implementation complete"
-
-Include in report:
-- Self-reflection findings
-- Whether fixes were applied
-- Final verification results
-```
-
-**Why this works:**
-Reduces latency when implementer already knows the fix. Documented case: would have saved one round-trip for entrypoint bug.
-
-**Trade-off:**
-Slightly more complex prompt, but faster end-to-end.
+如果 `.worktrees/` 未被忽略，智能体先修正 `.gitignore` 再创建 worktree。
 
 ---
 
-## Implementation Plan
+## 11. finishing-a-development-branch
 
-### Phase 1: High-Impact, Low-Risk (Do First)
+### 问题
 
-1. **verification-before-completion: Configuration change verification**
-   - Clear addition, doesn't change existing content
-   - Addresses high-impact problem (false confidence in tests)
-   - File: `skills/verification-before-completion/SKILL.md`
+分支完成后，智能体可能直接合并、直接删除 worktree，或者没有让用户明确选择集成方式。
 
-2. **testing-anti-patterns: Mock-interface drift**
-   - Adds new anti-pattern, doesn't modify existing
-   - Addresses high-impact problem (runtime crashes)
-   - File: `skills/testing-anti-patterns/SKILL.md`
+### 改进
 
-3. **requesting-code-review: Explicit file reading**
-   - Simple addition to template
-   - Fixes concrete problem (reviewers can't find files)
-   - File: `skills/requesting-code-review/SKILL.md`
+在所有测试通过后，只提供固定选项：
 
-### Phase 2: Moderate Changes (Test Carefully)
+1. 本地合并回基础分支
+2. 推送并创建 PR
+3. 保留分支不动
+4. 丢弃（仅在用户明确选择后，并要求二次确认）
 
-4. **subagent-driven-development: Process hygiene**
-   - Adds new section, doesn't change workflow
-   - Addresses medium-high impact (test reliability)
-   - File: `skills/subagent-driven-development/SKILL.md`
+清理 worktree 的规则必须依赖所选路径。
 
-5. **subagent-driven-development: Self-reflection**
-   - Changes prompt template (higher risk)
-   - But documented to catch bugs
-   - File: `skills/subagent-driven-development/SKILL.md`
+### 验收
 
-6. **subagent-driven-development: Skills reading requirement**
-   - Adds prompt overhead
-   - But ensures skills are actually used
-   - File: `skills/subagent-driven-development/SKILL.md`
-
-### Phase 3: Optimization (Validate First)
-
-7. **subagent-driven-development: Lean context option**
-   - Adds complexity (two approaches)
-   - Needs validation that it doesn't cause confusion
-   - File: `skills/subagent-driven-development/SKILL.md`
-
-8. **subagent-driven-development: Allow implementer to fix**
-   - Changes workflow (higher risk)
-   - Optimization, not bug fix
-   - File: `skills/subagent-driven-development/SKILL.md`
+没有用户选择时，智能体不会自行 merge 或删除分支。
 
 ---
 
-## Open Questions
+## 跨技能一致性
 
-1. **Lean context approach:**
-   - Should we make it the default for pattern-based tasks?
-   - How do we decide which approach to use?
-   - Risk of being too lean and missing important context?
+### 术语
 
-2. **Self-reflection:**
-   - Will this slow down simple tasks significantly?
-   - Should it only apply to complex tasks?
-   - How do we prevent "reflection fatigue" where it becomes rote?
+统一使用：
+- “your human partner” 而不是随意混用 “user”
+- “skill” 指可调用技能
+- “subagent” 指隔离上下文的子智能体
+- “verification” 指真实运行命令获得证据，而不是推理判断
 
-3. **Process hygiene:**
-   - Should this be in subagent-driven-development or a separate skill?
-   - Does it apply to other workflows beyond E2E tests?
-   - How do we handle cases where process SHOULD persist (dev servers)?
+### 强制性语言
 
-4. **Skills reading enforcement:**
-   - Should we require ALL subagents to read relevant skills?
-   - How do we keep prompts from becoming too long?
-   - Risk of over-documenting and losing focus?
+纪律型技能使用：
+- MUST
+- NEVER
+- NO EXCEPTIONS
+- STOP
 
----
+避免：
+- should
+- consider
+- when convenient
+- if possible
 
-## Success Metrics
+### Skill description
 
-How do we know these improvements work?
+Description 必须聚焦**何时使用**，而不是总结完整工作流，以防智能体只读 description 就跳过正文。
 
-1. **Configuration verification:**
-   - Zero instances of "test passed but wrong config was used"
-   - Jesse doesn't say "that's not actually testing what you think"
+## 测试计划
 
-2. **Process hygiene:**
-   - Zero instances of "test hit wrong server"
-   - No port conflict errors during E2E test runs
+每个修改过的技能遵循 writing-skills 的 TDD 流程：
 
-3. **Mock-interface drift:**
-   - Zero instances of "tests pass but runtime crashes on missing method"
-   - No method name mismatches between mocks and interfaces
+1. 在没有修改的版本上运行压力场景并记录失败。
+2. 应用最小修改。
+3. 重新运行同一场景。
+4. 捕获新的合理化借口。
+5. 加入明确反制。
+6. 重复直到压力下稳定遵守。
 
-4. **Self-reflection:**
-   - Measurable: Do implementer reports include self-reflection findings?
-   - Qualitative: Do fewer bugs make it to code review?
+优先测试组合压力：
+- 时间压力
+- 沉没成本
+- 权威压力
+- 疲劳
+- “务实”借口
 
-5. **Skills reading:**
-   - Subagent reports reference skill gate functions
-   - Fewer anti-pattern violations in code review
+## 实施顺序
 
----
+推荐顺序：
 
-## Risks and Mitigations
+1. using-superpowers
+2. brainstorming
+3. writing-plans
+4. executing-plans
+5. subagent-driven-development
+6. requesting-code-review
+7. receiving-code-review
+8. verification-before-completion
+9. dispatching-parallel-agents
+10. using-git-worktrees
+11. finishing-a-development-branch
 
-### Risk: Prompt Bloat
-**Problem:** Adding all these requirements makes prompts overwhelming
-**Mitigation:**
-- Phase implementation (don't add everything at once)
-- Make some additions conditional (E2E hygiene only for E2E tests)
-- Consider templates for different task types
+原因：前面的技能定义后面技能依赖的流程和交接方式。
 
-### Risk: Analysis Paralysis
-**Problem:** Too much reflection/verification slows execution
-**Mitigation:**
-- Keep gate functions quick (seconds, not minutes)
-- Make lean context opt-in initially
-- Monitor task completion times
+## 完成标准
 
-### Risk: False Sense of Security
-**Problem:** Following checklist doesn't guarantee correctness
-**Mitigation:**
-- Emphasize gate functions are minimums, not maximums
-- Keep "use judgment" language in skills
-- Document that skills catch common failures, not all failures
-
-### Risk: Skill Divergence
-**Problem:** Different skills give conflicting advice
-**Mitigation:**
-- Review changes across all skills for consistency
-- Document how skills interact (Integration sections)
-- Test with real scenarios before deployment
-
----
-
-## Recommendation
-
-**Proceed with Phase 1 immediately:**
-- verification-before-completion: Configuration change verification
-- testing-anti-patterns: Mock-interface drift
-- requesting-code-review: Explicit file reading
-
-**Test Phase 2 with Jesse before finalizing:**
-- Get feedback on self-reflection impact
-- Validate process hygiene approach
-- Confirm skills reading requirement is worth overhead
-
-**Hold Phase 3 pending validation:**
-- Lean context needs real-world testing
-- Implementer-fix workflow change needs careful evaluation
-
-These changes address real problems documented by users while minimizing risk of making skills worse.
+- 每个目标技能都有更新后的触发条件。
+- 强纪律技能都有明确 red flags / rationale countermeasures。
+- 交接关系没有歧义。
+- 所有变更通过对应压力测试。
+- 文档保持简洁，没有为了“更完整”而重复内容。
+- 最终用户工作流从 brainstorming → plan → implementation → review → verification → finish 能连贯执行。
