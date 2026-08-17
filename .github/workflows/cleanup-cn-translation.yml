@@ -1,0 +1,135 @@
+name: Cleanup cn translation helper
+
+on:
+  push:
+    branches:
+      - cn
+    paths:
+      - '.github/workflows/cleanup-cn-translation.yml'
+      - 'RELEASE-NOTES.md'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.repository == 'kmingee/superpowers'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out cn
+        uses: actions/checkout@v4
+        with:
+          ref: cn
+          fetch-depth: 0
+
+      - name: Verify translation is ready
+        id: ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+
+          targets = [
+              "RELEASE-NOTES.md",
+              "docs/porting-to-a-new-harness.md",
+              "docs/superpowers/plans/2026-01-22-document-review-system.md",
+              "docs/superpowers/plans/2026-02-19-visual-brainstorming-refactor.md",
+              "docs/superpowers/plans/2026-03-11-zero-dep-brainstorm-server.md",
+              "docs/superpowers/plans/2026-03-23-codex-app-compatibility.md",
+              "docs/superpowers/plans/2026-04-06-worktree-rototill.md",
+              "docs/superpowers/plans/2026-05-06-lift-drill-into-evals.md",
+              "docs/superpowers/plans/2026-05-07-pi-extension-and-evals.md",
+              "docs/superpowers/plans/2026-06-09-sdd-task-scoped-review-dispatch.md",
+              "docs/superpowers/plans/2026-06-09-visual-companion-issues.md",
+              "docs/superpowers/plans/2026-06-10-visual-companion-auth-hardening.md",
+              "docs/superpowers/plans/2026-06-11-visual-companion-final-hardening-fixup.md",
+              "docs/superpowers/plans/2026-07-06-sdd-plan-scoped-workspace.md",
+              "docs/superpowers/plans/2026-07-15-sdd-fix-loop-redesign.md",
+              "docs/superpowers/plans/2026-07-30-codex-efficiency-fixes.md",
+              "docs/superpowers/plans/2026-08-06-hermes-version-bump-wiring.md",
+              "docs/superpowers/specs/2026-01-22-document-review-system-design.md",
+              "docs/superpowers/specs/2026-02-19-visual-brainstorming-refactor-design.md",
+              "docs/superpowers/specs/2026-03-11-zero-dep-brainstorm-server-design.md",
+              "docs/superpowers/specs/2026-03-23-codex-app-compatibility-design.md",
+              "docs/superpowers/specs/2026-04-06-worktree-rototill-design.md",
+              "docs/superpowers/specs/2026-05-05-platform-neutral-config-refs-design.md",
+              "docs/superpowers/specs/2026-05-05-platform-neutral-prose-design.md",
+              "docs/superpowers/specs/2026-05-05-platform-neutral-readme-design.md",
+              "docs/superpowers/specs/2026-05-06-lift-drill-into-evals-design.md",
+              "docs/superpowers/specs/2026-06-09-sdd-task-scoped-review-dispatch-design.md",
+              "docs/superpowers/specs/2026-06-10-positive-instruction-redesign-design.md",
+              "docs/superpowers/specs/2026-06-10-strict-cost-sdd-design.md",
+              "docs/superpowers/specs/2026-06-10-visual-companion-auth-hardening-design.md",
+              "docs/superpowers/specs/2026-06-11-visual-companion-final-hardening-fixup-design.md",
+              "docs/superpowers/specs/2026-07-06-sdd-plan-scoped-workspace-eval-results.md",
+              "docs/superpowers/specs/2026-07-06-sdd-plan-scoped-workspace.md",
+              "docs/superpowers/specs/2026-07-15-sdd-fix-loop-redesign-design.md",
+              "docs/superpowers/specs/2026-07-30-codex-efficiency-fixes-design.md",
+              "docs/superpowers/specs/2026-08-05-hermes-version-bump-wiring-design.md",
+          ]
+
+          cjk = re.compile(r'[\u3400-\u9fff]')
+          ready = True
+          for rel in targets:
+              p = Path(rel)
+              if not p.exists() or not cjk.search(p.read_text(encoding='utf-8')):
+                  print(f'not translated yet: {rel}')
+                  ready = False
+                  continue
+              rc = subprocess.run(['git', 'diff', '--quiet', 'origin/main', '--', rel]).returncode
+              if rc == 0:
+                  print(f'unchanged from main: {rel}')
+                  ready = False
+          Path('/tmp/translation-ready').write_text('yes' if ready else 'no')
+          print('READY=' + ('yes' if ready else 'no'))
+          PY
+          echo "ready=$(cat /tmp/translation-ready)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate full Markdown set
+        if: steps.ready.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+
+          md = [p for p in Path('.').rglob('*.md') if '.git' not in p.parts]
+          # Temporary helper files are not Markdown; original repository has 94 Markdown paths.
+          if len(md) != 94:
+              raise SystemExit(f'Expected 94 Markdown files, found {len(md)}')
+
+          fence = re.compile(r'^\s*(```|~~~)')
+          failures = []
+          for p in md:
+              rel = p.as_posix()
+              try:
+                  before = subprocess.check_output(['git', 'show', f'origin/main:{rel}'], text=True)
+              except subprocess.CalledProcessError:
+                  continue
+              after = p.read_text(encoding='utf-8')
+              before_count = sum(1 for line in before.splitlines() if fence.match(line))
+              after_count = sum(1 for line in after.splitlines() if fence.match(line))
+              if before_count != after_count:
+                  failures.append(f'{rel}: fenced-code markers {before_count} -> {after_count}')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print('validated 94 Markdown files')
+          PY
+
+      - name: Remove temporary translation infrastructure
+        if: steps.ready.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/translate_md_cn.py
+          rm -f .github/workflows/translate-cn.yml
+          rm -f .github/workflows/cleanup-cn-translation.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'chore: remove temporary cn translation helpers'
+          git push origin HEAD:cn
