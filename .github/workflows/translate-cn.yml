@@ -1,0 +1,73 @@
+name: Translate cn historical Markdown
+
+on:
+  push:
+    branches:
+      - cn
+    paths:
+      - '.github/workflows/translate-cn.yml'
+      - 'scripts/translate_md_cn.py'
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    if: github.repository == 'kmingee/superpowers'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out cn
+        uses: actions/checkout@v4
+        with:
+          ref: cn
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install translator
+        run: python -m pip install --disable-pip-version-check argostranslate
+
+      - name: Translate remaining historical Markdown
+        run: python scripts/translate_md_cn.py
+
+      - name: Validate protected Markdown structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          from scripts.translate_md_cn import TARGETS
+
+          def fence_count(text):
+              return sum(1 for l in text.splitlines() if l.lstrip().startswith(('```', '~~~')))
+
+          failures = []
+          for rel in TARGETS:
+              after = Path(rel).read_text(encoding='utf-8')
+              before = subprocess.check_output(['git', 'show', f'HEAD:{rel}'], text=True)
+              if fence_count(before) != fence_count(after):
+                  failures.append(f'{rel}: fenced-code marker count changed')
+              # URLs must be preserved verbatim.
+              import re
+              url_re = re.compile(r'https?://[^\s)>\]]+')
+              if url_re.findall(before) != url_re.findall(after):
+                  failures.append(f'{rel}: URL sequence changed')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print(f'validated {len(TARGETS)} files')
+          PY
+
+      - name: Commit translations to cn
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*.md'
+          git diff --cached --quiet && { echo 'No Markdown changes produced'; exit 1; }
+          git commit -m 'docs: translate remaining historical Markdown to Simplified Chinese'
+          git push origin HEAD:cn
